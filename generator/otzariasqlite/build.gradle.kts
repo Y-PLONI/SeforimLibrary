@@ -42,6 +42,11 @@ tasks.register<JavaExec>("downloadAcronymizer") {
     classpath = files(tasks.named("jvmJar")) + configurations.getByName("jvmRuntimeClasspath")
 
     jvmArgs = listOf("-Xmx512m")
+
+    val trustStore = System.getProperty("javax.net.ssl.trustStore")
+    val trustStorePassword = System.getProperty("javax.net.ssl.trustStorePassword")
+    if (trustStore != null) systemProperty("javax.net.ssl.trustStore", trustStore)
+    if (trustStorePassword != null) systemProperty("javax.net.ssl.trustStorePassword", trustStorePassword)
 }
 
 // Alias: clearer name for the Acronymizer DB download task
@@ -61,6 +66,11 @@ tasks.register<JavaExec>("downloadOtzaria") {
     classpath = files(tasks.named("jvmJar")) + configurations.getByName("jvmRuntimeClasspath")
 
     jvmArgs = listOf("-Xmx512m")
+
+    val trustStore = System.getProperty("javax.net.ssl.trustStore")
+    val trustStorePassword = System.getProperty("javax.net.ssl.trustStorePassword")
+    if (trustStore != null) systemProperty("javax.net.ssl.trustStore", trustStore)
+    if (trustStorePassword != null) systemProperty("javax.net.ssl.trustStorePassword", trustStorePassword)
 }
 
 // Phase 1: generate categories/books/lines only
@@ -217,6 +227,11 @@ tasks.register<JavaExec>("appendOtzariaLines") {
         "--enable-native-access=ALL-UNNAMED",
         "--add-modules=jdk.incubator.vector"
     )
+
+    val trustStore = System.getProperty("javax.net.ssl.trustStore")
+    val trustStorePassword = System.getProperty("javax.net.ssl.trustStorePassword")
+    if (trustStore != null) systemProperty("javax.net.ssl.trustStore", trustStore)
+    if (trustStorePassword != null) systemProperty("javax.net.ssl.trustStorePassword", trustStorePassword)
 }
 
 // Append Otzaria links into an existing DB (seeded from the DB itself).

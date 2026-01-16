@@ -52,6 +52,11 @@ tasks.register<JavaExec>("writeReleaseInfo") {
     }
 
     jvmArgs = listOf("-Xmx256m")
+
+    val trustStore = System.getProperty("javax.net.ssl.trustStore")
+    val trustStorePassword = System.getProperty("javax.net.ssl.trustStorePassword")
+    if (trustStore != null) systemProperty("javax.net.ssl.trustStore", trustStore)
+    if (trustStorePassword != null) systemProperty("javax.net.ssl.trustStorePassword", trustStorePassword)
 }
 
 // Download lexical.db (from latest SeforimMagicIndexer release) next to seforim.db
@@ -77,6 +82,11 @@ tasks.register<JavaExec>("downloadLexicalDb") {
     }
 
     jvmArgs = listOf("-Xmx512m")
+
+    val trustStore = System.getProperty("javax.net.ssl.trustStore")
+    val trustStorePassword = System.getProperty("javax.net.ssl.trustStorePassword")
+    if (trustStore != null) systemProperty("javax.net.ssl.trustStore", trustStore)
+    if (trustStorePassword != null) systemProperty("javax.net.ssl.trustStorePassword", trustStorePassword)
 }
 
 // Package DB + Lucene indexes into single tar.zst and split

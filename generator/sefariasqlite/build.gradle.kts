@@ -64,4 +64,9 @@ tasks.register<JavaExec>("generateSefariaSqlite") {
         "-XX:+UseG1GC",
         "-XX:MaxGCPauseMillis=200"
     )
+
+    val trustStore = System.getProperty("javax.net.ssl.trustStore")
+    val trustStorePassword = System.getProperty("javax.net.ssl.trustStorePassword")
+    if (trustStore != null) systemProperty("javax.net.ssl.trustStore", trustStore)
+    if (trustStorePassword != null) systemProperty("javax.net.ssl.trustStorePassword", trustStorePassword)
 }
