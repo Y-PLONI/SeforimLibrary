@@ -21,3 +21,8 @@ repomix-output.xml
 *.db.bak
 *.db-shm
 *.db-wal
+generator/sefariasqlite/bin/jvmMain/authors_blacklist.txt
+generator/sefariasqlite/bin/jvmMain/books_blacklist.txt
+generator/sefariasqlite/bin/jvmMain/default_targumim.json
+generator/sefariasqlite/bin/jvmMain/default_commentators.json
+generator/sefariasqlite/bin/jvmMain/priority.txt
