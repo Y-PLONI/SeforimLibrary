@@ -185,7 +185,8 @@ class SefariaDirectImporter(
                 totalLines = payload.lines.size,
                 hasAltStructures = false,
                 hasTeamim = hasTeamim,
-                hasNekudot = hasNekudot
+                hasNekudot = hasNekudot,
+                filePath = bookPath
             )
             repository.insertBook(book)
 

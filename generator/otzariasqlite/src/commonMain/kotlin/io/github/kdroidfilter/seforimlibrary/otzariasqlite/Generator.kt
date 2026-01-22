@@ -735,7 +735,8 @@ class DatabaseGenerator(
             notesContent = notesContent,
             order = meta?.order ?: 999f,
             topics = extractTopics(path),
-            isBaseBook = isBaseBook
+            isBaseBook = isBaseBook,
+            filePath = toLibraryRelativeKey(path).substringBeforeLast('.')
         )
 
         logger.d { "Inserting book '${book.title}' with ID: ${book.id} and categoryId: ${book.categoryId}" }
