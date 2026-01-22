@@ -47,4 +47,5 @@ data class Book(
     val hasAltStructures: Boolean = false,
     val hasTeamim: Boolean = false,
     val hasNekudot: Boolean = false,
+    val filePath: String? = null,
 )

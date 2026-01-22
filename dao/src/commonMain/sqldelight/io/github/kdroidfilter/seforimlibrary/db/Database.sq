@@ -83,6 +83,13 @@ CREATE TABLE IF NOT EXISTS book (
     hasAltStructures INTEGER NOT NULL DEFAULT 0,
     hasTeamim INTEGER NOT NULL DEFAULT 0,
     hasNekudot INTEGER NOT NULL DEFAULT 0,
+    isContentExternal INTEGER DEFAULT 0,
+    externalLibraryId TEXT DEFAULT NULL,
+    isPersonal INTEGER DEFAULT 0,
+    filePath TEXT DEFAULT NULL,
+    fileType TEXT DEFAULT 'txt',
+    fileSize INTEGER DEFAULT NULL,
+    lastModified INTEGER DEFAULT NULL,
     FOREIGN KEY (categoryId) REFERENCES category(id) ON DELETE CASCADE,
     FOREIGN KEY (sourceId) REFERENCES source(id) ON DELETE RESTRICT
 );

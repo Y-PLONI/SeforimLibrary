@@ -860,7 +860,8 @@ class SeforimRepository(databasePath: String, private val driver: SqlDriver) {
                 hasSourceConnection = if (book.hasSourceConnection) 1 else 0,
                 hasAltStructures = if (book.hasAltStructures) 1 else 0,
                 hasTeamim = if (book.hasTeamim) 1 else 0,
-                hasNekudot = if (book.hasNekudot) 1 else 0
+                hasNekudot = if (book.hasNekudot) 1 else 0,
+                filePath = book.filePath
             )
             logger.d{"Used insertWithId for book '${book.title}' with ID: ${book.id} and categoryId: ${book.categoryId}"}
 
@@ -917,7 +918,8 @@ class SeforimRepository(databasePath: String, private val driver: SqlDriver) {
                 hasSourceConnection = if (book.hasSourceConnection) 1 else 0,
                 hasAltStructures = if (book.hasAltStructures) 1 else 0,
                 hasTeamim = if (book.hasTeamim) 1 else 0,
-                hasNekudot = if (book.hasNekudot) 1 else 0
+                hasNekudot = if (book.hasNekudot) 1 else 0,
+                filePath = book.filePath
             )
             val id = database.bookQueriesQueries.lastInsertRowId().executeAsOne()
             logger.d{"Used insert for book '${book.title}', got ID: $id with categoryId: ${book.categoryId}"}
