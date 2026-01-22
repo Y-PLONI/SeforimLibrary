@@ -14,9 +14,9 @@ tasks.register("generateSeforimDb") {
     dependsOn(":sefariasqlite:generateSefariaSqlite")
     dependsOn(":otzariasqlite:appendOtzaria")
     dependsOn(":otzariasqlite:generateHavroutaLinks")
-    dependsOn(":catalog:buildCatalog")
-    dependsOn(":searchindex:buildLuceneIndexDefault")
-    dependsOn(":packaging:writeReleaseInfo")
+    //dependsOn(":catalog:buildCatalog")
+    //dependsOn(":searchindex:buildLuceneIndexDefault")
+    //dependsOn(":packaging:writeReleaseInfo")
     dependsOn(":packaging:downloadLexicalDb")
 }
 
