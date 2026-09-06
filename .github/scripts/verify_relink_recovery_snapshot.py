@@ -31,6 +31,8 @@ DATA_IMAGE = re.compile(
     re.IGNORECASE,
 )
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
+PAYLOAD_META_SCHEMAS = frozenset({2, 3})
+BASELINE_SCHEMA = 2
 
 
 def _sha256(path: Path) -> str:
@@ -116,8 +118,19 @@ def verify(
         raise SystemExit("original raw snapshot SHA does not match Linker payload metadata")
     if baseline.get("snapshot_sha256") != original_sha:
         raise SystemExit("line baseline is not bound to the original raw snapshot")
-    if meta.get("schema_version") != 2 or baseline.get("schema_version") != 2:
-        raise SystemExit("recovery snapshot comparison requires schema 2")
+    # The Linker bumped meta.json to schema 3 in a9ae2d4 (2026-08-31) without
+    # changing ``snapshot.sha256`` — the only field read here. The line baseline
+    # manifest is still schema 2 (line_baseline.SCHEMA_VERSION).
+    if meta.get("schema_version") not in PAYLOAD_META_SCHEMAS:
+        raise SystemExit(
+            "recovery snapshot comparison requires Linker meta schema "
+            f"{sorted(PAYLOAD_META_SCHEMAS)}, got {meta.get('schema_version')!r}"
+        )
+    if baseline.get("schema_version") != BASELINE_SCHEMA:
+        raise SystemExit(
+            f"recovery snapshot comparison requires line baseline schema {BASELINE_SCHEMA}, "
+            f"got {baseline.get('schema_version')!r}"
+        )
 
     connections = []
     for path in (original, rebuilt):

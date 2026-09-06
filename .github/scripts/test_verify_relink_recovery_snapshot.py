@@ -43,7 +43,8 @@ def make_snapshot(path: Path, content: str, context: str = "ספר א") -> None:
 
 
 class RecoverySnapshotVerifierTest(unittest.TestCase):
-    def run_case(self, original_content, rebuilt_content, artifact_record=None, rebuilt_context="ספר א"):
+    def run_case(self, original_content, rebuilt_content, artifact_record=None, rebuilt_context="ספר א",
+                 meta_schema=2, baseline_schema=2):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -53,12 +54,12 @@ class RecoverySnapshotVerifierTest(unittest.TestCase):
         digest = hashlib.sha256(original.read_bytes()).hexdigest()
         payload_meta = root / "meta.json"
         payload_meta.write_text(
-            json.dumps({"schema_version": 2, "snapshot": {"sha256": digest}}),
+            json.dumps({"schema_version": meta_schema, "snapshot": {"sha256": digest}}),
             encoding="utf-8",
         )
         baseline = root / "baseline.json"
         baseline.write_text(
-            json.dumps({"schema_version": 2, "snapshot_sha256": digest}),
+            json.dumps({"schema_version": baseline_schema, "snapshot_sha256": digest}),
             encoding="utf-8",
         )
         artifacts = root / "artifacts" / "Sefaria"
@@ -83,6 +84,23 @@ class RecoverySnapshotVerifierTest(unittest.TestCase):
         result = self.run_case("טקסט", "טקסט")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("unlinked_image_src_differences=0", result.stdout)
+
+    def test_linker_meta_schema_3_passes(self):
+        # The Linker writes meta.json schema 3 since a9ae2d4; the snapshot sha
+        # field it binds is unchanged, so a recovery must still verify.
+        result = self.run_case("טקסט", "טקסט", meta_schema=3)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("RECOVERY_SNAPSHOT_SEMANTIC_OK", result.stdout)
+
+    def test_unknown_linker_meta_schema_fails(self):
+        result = self.run_case("טקסט", "טקסט", meta_schema=4)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Linker meta schema", result.stderr)
+
+    def test_unknown_baseline_schema_fails(self):
+        result = self.run_case("טקסט", "טקסט", baseline_schema=3)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("line baseline schema 2", result.stderr)
 
     def test_unlinked_remote_to_inline_image_passes(self):
         inline = base64.b64encode(b"png").decode()
