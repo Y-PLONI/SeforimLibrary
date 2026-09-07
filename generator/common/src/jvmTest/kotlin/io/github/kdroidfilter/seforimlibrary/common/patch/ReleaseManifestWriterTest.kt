@@ -5,6 +5,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.nio.file.Files
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -72,6 +73,85 @@ class ReleaseManifestWriterTest {
         )
         val body = Files.readString(target)
         assertFalse(body.contains("catalogBlobName"), body)
+    }
+
+    @Test
+    fun `writeManifest emits both table-hash maps in iteration order`() {
+        val patch = tmp.newFile("patch.db").toPath()
+        Files.writeString(patch, "hello world")
+        val compressed = PatchCompressor.compress(patch, level = 3, workers = 1)
+        val target = ReleaseManifestWriter().writeManifest(
+            patchFile = patch,
+            fromVersion = 1,
+            toVersion = 2,
+            fromSchemaVersion = 5,
+            toSchemaVersion = 5,
+            fromContentHash = "aaaa",
+            toContentHash = "bbbb",
+            compressed = ReleaseManifestWriter.CompressedPatchSpec(
+                file = compressed.compressedFile,
+                sha256 = compressed.compressedSha256,
+                size = compressed.compressedSize,
+                compression = "zstd",
+            ),
+            fromTableContentHashes = linkedMapOf("source" to "11", "author" to "22"),
+            toTableContentHashes = linkedMapOf("source" to "11", "author" to "33"),
+        )
+        val body = Files.readString(target)
+        assertTrue(
+            body.contains("\"fromTableContentHashes\": {\n    \"source\": \"11\",\n    \"author\": \"22\"\n  },"),
+            body,
+        )
+        assertTrue(
+            body.contains("\"toTableContentHashes\": {\n    \"source\": \"11\",\n    \"author\": \"33\"\n  },"),
+            body,
+        )
+        // Still a valid JSON object with the required whole-DB hashes.
+        assertTrue(body.contains("\"toContentHash\": \"bbbb\""))
+        assertTrue(body.contains("\"patchFiles\": ["))
+    }
+
+    @Test
+    fun `writeManifest omits the table-hash maps when not supplied`() {
+        val patch = tmp.newFile("patch.db").toPath()
+        Files.writeString(patch, "hello world")
+        val compressed = PatchCompressor.compress(patch, level = 3, workers = 1)
+        val target = ReleaseManifestWriter().writeManifest(
+            patchFile = patch,
+            fromVersion = 1, toVersion = 2,
+            fromSchemaVersion = 5, toSchemaVersion = 5,
+            fromContentHash = "aaaa", toContentHash = "bbbb",
+            compressed = ReleaseManifestWriter.CompressedPatchSpec(
+                file = compressed.compressedFile,
+                sha256 = compressed.compressedSha256,
+                size = compressed.compressedSize,
+                compression = "zstd",
+            ),
+        )
+        val body = Files.readString(target)
+        assertFalse(body.contains("TableContentHashes"), body)
+    }
+
+    @Test
+    fun `writeManifest rejects only one of the two table-hash maps`() {
+        val patch = tmp.newFile("patch.db").toPath()
+        Files.writeString(patch, "hello world")
+        val compressed = PatchCompressor.compress(patch, level = 3, workers = 1)
+        assertFailsWith<IllegalArgumentException> {
+            ReleaseManifestWriter().writeManifest(
+                patchFile = patch,
+                fromVersion = 1, toVersion = 2,
+                fromSchemaVersion = 5, toSchemaVersion = 5,
+                fromContentHash = "aaaa", toContentHash = "bbbb",
+                compressed = ReleaseManifestWriter.CompressedPatchSpec(
+                    file = compressed.compressedFile,
+                    sha256 = compressed.compressedSha256,
+                    size = compressed.compressedSize,
+                    compression = "zstd",
+                ),
+                toTableContentHashes = mapOf("source" to "11"),
+            )
+        }
     }
 
     @Test

@@ -18,6 +18,12 @@ data class DeltaManifest(
     val fromContentHash: String,
     val toContentHash: String,
     /**
+     * Per-table logical hashes, keyed by the hash table order of
+     * from/toSchemaVersion. Empty on manifests produced before this field.
+     */
+    val fromTableContentHashes: Map<String, String> = emptyMap(),
+    val toTableContentHashes: Map<String, String> = emptyMap(),
+    /**
      * Books touched / added / removed / renamed between fromVersion and toVersion.
      * Empty when the diff has no per-book scope (e.g. lookup-only changes).
      */

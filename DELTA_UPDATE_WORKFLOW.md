@@ -194,6 +194,42 @@ copy(v1) → apply(patch) → LogicalContentHasher.compute() == hash(v2)
 If this fails, `producePatchAndVerify` exits non-zero and the
 release is NOT published.
 
+### 1.4 Per-table content hashes
+
+`LogicalContentHasher.computeReport()` returns, in one pass, both the whole-DB
+hash and `tableHashes` — for each table of the hash table order,
+`sha256` of exactly the bytes that table contributed to the whole stream
+(the `" table:<t> "` prefix included; an absent table hashes to its prefix
+alone). Therefore
+`wholeHash == sha256(stream(t1) ‖ stream(t2) ‖ …)`.
+
+The pipeline ships both maps in the manifest:
+
+```json
+"fromTableContentHashes": { "source": "<hex>", "author": "<hex>", … },
+"toTableContentHashes":   { "source": "<hex>", … }
+```
+
+- Keys = every table of the hash table order for `fromSchemaVersion` /
+  `toSchemaVersion` respectively, in that order. Both maps are present or
+  both absent; `fromContentHash` / `toContentHash` stay required, so old
+  clients are unaffected.
+- The verify-apply gate compares the applied per-table hashes with new's, on
+  top of the whole-hash check — the maps a release publishes are gated as
+  hard as the hash the client verifies against.
+
+**Why the client cares:** whole-DB verification streams ~80% of a 6 GB file
+after every applied patch. With these maps the client verifies only the
+tables whose `from` and `to` hashes differ, plus every table the patch has
+upsert/delete rows for, plus `schema_meta`; the rest are deferred to a
+read-only pass after the update is committed and the library is readable
+again. Drift found in a deferred table is reported, not rolled back.
+
+The oracle for both sides is `logical_hash_contract.json` — byte-identical in
+`generator/common/src/jvmTest/resources/` and the updater's `test/`, cmp'd by
+`contract.yml`. Do not regenerate it unless both sides fail identically and
+the change is deliberate.
+
 ---
 
 ## 2. CDN / static-host layout

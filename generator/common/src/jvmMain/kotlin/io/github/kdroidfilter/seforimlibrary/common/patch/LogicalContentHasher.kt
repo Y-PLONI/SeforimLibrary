@@ -24,40 +24,71 @@ class LogicalContentHasher(
     private val logger: Logger = Logger.withTag("LogicalContentHasher"),
 ) {
 
-    fun compute(conn: Connection): String {
-        val md = MessageDigest.getInstance("SHA-256")
-        for (table in tables) {
-            md.update(" table:$table ".toByteArray())
-            val cols = readColumnsCanonical(conn, table) ?: continue // table not present
-            md.update(cols.joinToString(",", prefix = "cols:").toByteArray())
-            md.update(byteArrayOf(0x00))
+    /**
+     * Whole-DB hash plus the per-table digest of exactly the bytes each table
+     * contributed to it, in hash table order.
+     */
+    data class Report(
+        val wholeHash: String,
+        val tableHashes: LinkedHashMap<String, String>,
+    )
+
+    fun compute(conn: Connection): String = computeReport(conn).wholeHash
+
+    /**
+     * One pass, two digests: whole-DB and per-table (reset at each table boundary),
+     * so the client can verify only the tables a patch could have touched.
+     */
+    fun computeReport(conn: Connection): Report {
+        val whole = MessageDigest.getInstance("SHA-256")
+        val table = MessageDigest.getInstance("SHA-256")
+        val sink = DualDigest(whole, table)
+        val tableHashes = LinkedHashMap<String, String>()
+        for (t in tables) {
+            sink.update(" table:$t ".toByteArray())
+            val cols = readColumnsCanonical(conn, t)
+            if (cols == null) { // table not present — its stream is just the prefix
+                tableHashes[t] = hex(table.digest())
+                continue
+            }
+            sink.update(cols.joinToString(",", prefix = "cols:").toByteArray())
+            sink.update(byteArrayOf(0x00))
 
             val colsSql = cols.joinToString(",") { "\"$it\"" }
             val pkOrder = if ("id" in cols) "id" else cols.joinToString(",") { "\"$it\"" }
             conn.createStatement().use { st ->
-                st.executeQuery("SELECT $colsSql FROM \"$table\" ORDER BY $pkOrder").use { rs ->
-                    val meta = rs.metaData
-                    val n = meta.columnCount
+                st.executeQuery("SELECT $colsSql FROM \"$t\" ORDER BY $pkOrder").use { rs ->
+                    val n = rs.metaData.columnCount
                     while (rs.next()) {
-                        for (i in 1..n) encodeCell(md, rs, i)
-                        md.update(byteArrayOf(0xFF.toByte()))
+                        for (i in 1..n) encodeCell(sink, rs, i)
+                        sink.update(byteArrayOf(0xFF.toByte()))
                     }
                 }
             }
+            tableHashes[t] = hex(table.digest()) // digest() also resets for the next table
         }
-        val digest = md.digest()
-        return digest.joinToString("") { "%02x".format(it) }
+        return Report(hex(whole.digest()), tableHashes)
     }
 
-    private fun encodeCell(md: MessageDigest, rs: java.sql.ResultSet, i: Int) {
+    /** Feeds the same bytes to the whole-DB digest and the current table's digest. */
+    private class DualDigest(private val whole: MessageDigest, private val table: MessageDigest) {
+        fun update(bytes: ByteArray) {
+            whole.update(bytes)
+            table.update(bytes)
+        }
+    }
+
+    private fun hex(digest: ByteArray): String = digest.joinToString("") { "%02x".format(it) }
+
+    private fun encodeCell(sink: DualDigest, rs: java.sql.ResultSet, i: Int) {
         val obj = rs.getObject(i)
         when {
-            obj == null || rs.wasNull() -> md.update(byteArrayOf(0))
-            obj is ByteArray -> { md.update(byteArrayOf(1)); md.update(obj) }
-            obj is Number -> { md.update(byteArrayOf(2)); md.update(obj.toString().toByteArray()) }
-            else -> { md.update(byteArrayOf(3)); md.update(obj.toString().toByteArray()) }
+            obj == null || rs.wasNull() -> sink.update(byteArrayOf(0))
+            obj is ByteArray -> { sink.update(byteArrayOf(1)); sink.update(obj) }
+            obj is Number -> { sink.update(byteArrayOf(2)); sink.update(obj.toString().toByteArray()) }
+            else -> { sink.update(byteArrayOf(3)); sink.update(obj.toString().toByteArray()) }
         }
-        md.update(byteArrayOf(0x1F)) // unit separator between cells
+        sink.update(byteArrayOf(0x1F)) // unit separator between cells
     }
 
     private fun readColumnsCanonical(conn: Connection, table: String): List<String>? {
