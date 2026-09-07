@@ -97,9 +97,10 @@ fun main(args: Array<String>) {
     // Verify apply: copy prev, apply patch, hash, compare with hash(new).
     val target = outPath.resolveSibling("verify-${outPath.fileName}")
     Files.copy(prevPath, target, StandardCopyOption.REPLACE_EXISTING)
-    val newHash = DriverManager.getConnection("jdbc:sqlite:${newPath.toAbsolutePath()}").use {
-        LogicalContentHasher.forSchemaVersion(toSchemaVersion).compute(it)
+    val newReport = DriverManager.getConnection("jdbc:sqlite:${newPath.toAbsolutePath()}").use {
+        LogicalContentHasher.forSchemaVersion(toSchemaVersion).computeReport(it)
     }
+    val newHash = newReport.wholeHash
     DriverManager.getConnection("jdbc:sqlite:${target.toAbsolutePath()}").use { conn ->
         conn.createStatement().use { it.execute("PRAGMA foreign_keys = ON") }
         // The producer ships upserts/deletes for every table in
@@ -114,10 +115,20 @@ fun main(args: Array<String>) {
             expectedToContentHash = newHash,
             expectedToSchemaVersion = toSchemaVersion,
         )
-        val appliedHash = LogicalContentHasher.forSchemaVersion(toSchemaVersion).compute(conn)
+        val appliedReport = LogicalContentHasher.forSchemaVersion(toSchemaVersion).computeReport(conn)
+        val appliedHash = appliedReport.wholeHash
         check(appliedHash == newHash) {
             "Patch verification FAILED: applied=$appliedHash expected=$newHash — " +
                 "inspect with diagnoseHashMismatch; refusing to publish this patch."
+        }
+        // The per-table hashes ship in the manifest and drive the client's
+        // partial verification, so they are gated as hard as the whole hash.
+        val divergent = newReport.tableHashes.keys.filter {
+            appliedReport.tableHashes[it] != newReport.tableHashes[it]
+        }
+        check(divergent.isEmpty()) {
+            "Patch verification FAILED: per-table hashes diverge for ${divergent.joinToString(", ")} — " +
+                "refusing to publish this patch."
         }
         logger.i { "✅ Patch apply verified: target hash matches new ($newHash)" }
     }
@@ -158,6 +169,10 @@ fun main(args: Array<String>) {
             "(${"%.1f".format(compressed.compressedSize * 100.0 / Files.size(outPath))}%)"
     }
 
+    val prevReport = DriverManager.getConnection("jdbc:sqlite:${prevPath.toAbsolutePath()}").use {
+        LogicalContentHasher.forSchemaVersion(fromSchemaVersion).computeReport(it)
+    }
+
     // Emit a per-delta manifest.json next to the .zst.
     ReleaseManifestWriter(logger).writeManifest(
         patchFile = outPath,
@@ -165,10 +180,10 @@ fun main(args: Array<String>) {
         toVersion = to,
         fromSchemaVersion = fromSchemaVersion,
         toSchemaVersion = toSchemaVersion,
-        fromContentHash = DriverManager.getConnection("jdbc:sqlite:${prevPath.toAbsolutePath()}").use {
-            LogicalContentHasher.forSchemaVersion(fromSchemaVersion).compute(it)
-        },
+        fromContentHash = prevReport.wholeHash,
         toContentHash = newHash,
+        fromTableContentHashes = prevReport.tableHashes,
+        toTableContentHashes = newReport.tableHashes,
         compressed = ReleaseManifestWriter.CompressedPatchSpec(
             file = compressed.compressedFile,
             sha256 = compressed.compressedSha256,

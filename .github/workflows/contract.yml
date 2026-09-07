@@ -13,6 +13,8 @@ jobs:
     env:
       KOTLIN_FIXTURE: generator/common/src/jvmTest/resources/patch_tables_contract.json
       DART_FIXTURE: seforim-library-updater/test/patch_tables_contract.json
+      KOTLIN_HASH_FIXTURE: generator/common/src/jvmTest/resources/logical_hash_contract.json
+      DART_HASH_FIXTURE: seforim-library-updater/test/logical_hash_contract.json
       KOTLIN_VISIBILITY_FIXTURE: generator/sefariasqlite/src/jvmTest/resources/link_visibility_contract_v1.json
       SEFARIA_VISIBILITY_FIXTURE: sefaria-export/link_visibility_contract_v1.json
     steps:
@@ -63,6 +65,8 @@ jobs:
         run: |
           test -f "$KOTLIN_FIXTURE"
           test -f "$DART_FIXTURE"
+          test -f "$KOTLIN_HASH_FIXTURE"
+          test -f "$DART_HASH_FIXTURE"
           test -f "$KOTLIN_VISIBILITY_FIXTURE"
           test -f "$SEFARIA_VISIBILITY_FIXTURE"
 
@@ -70,6 +74,7 @@ jobs:
       - name: cmp fixtures (byte-identical)
         run: |
           cmp "$KOTLIN_FIXTURE" "$DART_FIXTURE"
+          cmp "$KOTLIN_HASH_FIXTURE" "$DART_HASH_FIXTURE"
           cmp "$KOTLIN_VISIBILITY_FIXTURE" "$SEFARIA_VISIBILITY_FIXTURE"
 
       # cmp לבדו תופס רק סטייה בין שני ה-fixtures. שינוי ברשימת הטבלאות בצד Kotlin
@@ -89,4 +94,4 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run Kotlin patch-tables contract test
-        run: ./gradlew :generator-common:jvmTest --tests '*PatchTablesContractTest*' --no-daemon
+        run: ./gradlew :generator-common:jvmTest --tests '*PatchTablesContractTest*' --tests '*LogicalHashContractTest*' --no-daemon

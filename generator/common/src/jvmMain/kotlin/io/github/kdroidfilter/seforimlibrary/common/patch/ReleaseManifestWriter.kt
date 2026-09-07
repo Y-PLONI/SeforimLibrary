@@ -51,8 +51,15 @@ class ReleaseManifestWriter(
         toContentHash: String,
         compressed: CompressedPatchSpec,
         catalogBlobName: String? = null,
+        fromTableContentHashes: Map<String, String> = emptyMap(),
+        toTableContentHashes: Map<String, String> = emptyMap(),
     ): Path {
         require(Files.isRegularFile(patchFile)) { "patch file not found: $patchFile" }
+        // Both maps or neither: a client that sees only one side cannot decide
+        // which tables a patch left untouched, and would silently fall back.
+        require(fromTableContentHashes.isEmpty() == toTableContentHashes.isEmpty()) {
+            "fromTableContentHashes and toTableContentHashes must both be given or both omitted"
+        }
         val uncompressedSha256 = sha256(patchFile)
         val uncompressedSize = Files.size(patchFile)
         val target = compressed.file.resolveSibling("${compressed.file.fileName}.manifest.json")
@@ -65,6 +72,10 @@ class ReleaseManifestWriter(
             append("  \"patchFormatVersion\": ").append(PatchDbSchema.CURRENT_VERSION).append(",\n")
             append("  \"fromContentHash\": ").appendString(fromContentHash).append(",\n")
             append("  \"toContentHash\": ").appendString(toContentHash).append(",\n")
+            if (fromTableContentHashes.isNotEmpty()) {
+                appendHashMap("fromTableContentHashes", fromTableContentHashes)
+                appendHashMap("toTableContentHashes", toTableContentHashes)
+            }
             append("  \"patchFiles\": [\n")
             append("    {\n")
             append("      \"file\": ").appendString(compressed.file.fileName.toString()).append(",\n")
@@ -165,6 +176,18 @@ class ReleaseManifestWriter(
     )
 
     // ─── Minimal JSON helpers (kept dep-free) ──────────────────────────────────
+
+    /** Emits `"<name>": { … },` — keys in map iteration order (= hash table order). */
+    private fun StringBuilder.appendHashMap(name: String, values: Map<String, String>) {
+        append("  ").appendString(name).append(": {\n")
+        var i = 0
+        for ((table, hash) in values) {
+            append("    ").appendString(table).append(": ").appendString(hash)
+            if (++i < values.size) append(",")
+            append("\n")
+        }
+        append("  },\n")
+    }
 
     private fun StringBuilder.appendString(s: String): StringBuilder {
         append('"')
